@@ -7,14 +7,14 @@ def _format_quote(quote):
 		return '#%d - %s - %s'%(
 			quote['id'],
 			quote['quote'][:300],
-			quote['url'].replace('bakayarou.kungfudiscomonkey','b.kf-dm'),
+			quote['url'],
 		)
 	else:
 		return '#%d - Rating: %d - %s - %s'%(
 			quote['id'],
 			quote['rating'],
 			quote['quote'][:300],
-			quote['url'].replace('bakayarou.kungfudiscomonkey','b.kf-dm'),
+			quote['url'],
 		)
 
 def _rpc_get_quote(bot):
@@ -48,7 +48,7 @@ def _rpc_add_quote(bot,quote):
 	response = _call_rpc(url,{'submit_quote': 'client', 'username':user, 'password':password, 'quote':quote})
 	try: return 'Added quote %d - %s'%(
 		response['id'],
-		response['url'].replace('bakayarou.kungfudiscomonkey','b.kf-dm'),
+		response['url'],
 	)
 	except KeyError: raise CommandError('Error decoding message')
 	

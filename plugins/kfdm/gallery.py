@@ -11,7 +11,7 @@ def _get_image(bot):
 	try: return '#%d - %s - %s'%(
 		response['id'],
 		response['name'],
-		response['url'].replace('bakayarou.kungfudiscomonkey','b.kf-dm')
+		response['url']
 	)
 	except KeyError: raise CommandError('Error decoding message')
 
@@ -26,7 +26,7 @@ def _search_image(bot,query):
 		msg = '#%d - %s - %s'%(
 			image['id'],
 			image['name'],
-			image['url'].replace('bakayarou.kungfudiscomonkey','b.kf-dm')
+			image['url']
 		)
 		num = len(response['images'])
 		if(num>1):
