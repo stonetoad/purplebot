@@ -22,6 +22,8 @@ def _search_image(bot,query):
 	
 	response = _call_rpc(url,{'search':query,'username':user, 'password':password})
 	try:
+		if(len(response['images'])==0):
+			return 'No images found for query: '+query
 		image = random.choice(response['images'])
 		msg = '#%d - %s - %s'%(
 			image['id'],
