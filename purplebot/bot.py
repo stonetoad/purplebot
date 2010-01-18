@@ -78,17 +78,28 @@ class bot(irc):
 	def __parse_commands(self,bot,line):
 		'[":hostname(sender)","PRIVMSG","reciever(#channel or nick)",":*",*]'
 		try:
-			nick, host = self.parse_hostmask(line[0])
+			nick, host = self.parse_hostmask(line.src)
 			if(nick == self._nick):
 				return # Bot doesn't need to parse it's own messages
-			if self.block_check(line[0]):
+			if self.block_check(line.src):
 				return # Ignore messages from blocked users
-			line[3] = string.lstrip(line[3],':')
+			cmd_key = string.lstrip(line[3],':')
 			
-			if line[3] in self.__commands.keys():
-				cmd = self.__commands[line[3]]
+			if cmd_key in self.__commands.keys():
+				# Add in the command specific keys
+				line.command = cmd_key
+				line.srcnick = nick
+				line.srchost = host
+				
+				# Convert the message to just a string
+				line.message = line[4] if len(line)>4 else ''
+								
+				#Privmsg to the bot or a channel ?
+				line.pm = True if (line.dst == self._nick) else False
+				
+				cmd = self.__commands[cmd_key]
 				if hasattr(cmd,'alias'):
-					print 'Alias command',line[3],'=>',cmd.alias
+					print 'Alias command',cmd_key,'=>',cmd.alias
 					if not cmd.alias in self.__commands.keys():
 						raise CommandError('Invalid Alias')
 					cmd = self.__commands[cmd.alias]
@@ -276,9 +287,9 @@ class bot(irc):
 			if hasattr(self.__commands[cmd], 'example'):
 				return self.__commands[cmd].example
 			else:
-				return 'No help for that command'
+				return 'No help for command: "%s"'%cmd
 		else:
-			return 'Invalid Command'
+			return 'Unknown Command: "%s"'%cmd
 	
 	def plugin_list(self):
 		return self.__plugins.keys()

@@ -4,6 +4,8 @@ import sys
 import ircsocket
 import signal
 
+from ircmessage import message
+
 class irc(object):
 	def __init__ (self,debug=1,log=True):
 		self.buffer = ''
@@ -72,48 +74,45 @@ class irc(object):
 	# Parsing Functions
 	###########################################################################
 	def parse_line(self,line):
-		message=string.rstrip(line).split(' ',4)
+		msg = message(line) 
 		try:
-			if(message[1]=="PRIVMSG"):
+			if(msg.type=='PRIVMSG'):
 				self.log('>> %s'%line)
-				self.__event_privmsg(message)
-			elif(message[1]=="NOTICE"):
+				self.__event_privmsg(msg)
+			elif(msg.type=='NOTICE'):
 				self.log('>> %s'%line)
-				self.__event_notice(message)
-			elif(message[1]=="JOIN"):
+				self.__event_notice(msg)
+			elif(msg.type=="JOIN"):
 				self.log('>> %s'%line)
-				self.__event_join(message)
-			elif(message[1]=="PART"):
+				self.__event_join(msg)
+			elif(msg.type=="PART"):
 				self.log('>> %s'%line)
-				self.__event_part(message)
-			elif(message[1]=="PONG"):
-				self.debug(message)
-				self.irc_ping(message[2])
-			elif(message[1]=="MODE"):
+				self.__event_part(msg)
+			elif(msg.type=="PONG"):
+				self.debug(msg)
+				self.irc_ping(msg.dst)
+			elif(msg.type=="MODE"):
 				self.log('>> %s'%line)
-				self.__event_mode(message)
-			elif(message[1]=="NICK"):
+				self.__event_mode(msg)
+			elif(msg.type=="NICK"):
 				self.log('>> %s'%line)
-				self.__event_nick(message)
+				self.__event_nick(msg)
+			elif(msg.type=="PING"):
+				self.log('>> %s'%line)
+				self.irc_pong(msg.src)
+				if not self.connected:
+					self.connected = True
+					for event in self._events_connect:
+						self.debug('Connect Event:'+event.__name__)
+						event(self)
+			elif(msg.type=="ERROR"):
+				self.log('>> %s'%line)
+				self.debug("---Error--- "+msg._line)
+				self._socket.close()
+				self.running = False
 			else:
-				if(message[0]=="PING"):
-					self.log('>> %s'%line)
-					self.irc_pong(message[1])
-					if not self.connected:
-						self.connected = True
-						for event in self._events_connect:
-							self.debug('Connect Event:'+event.__name__)
-							event(self)
-				elif(message[0]=="ERROR"):
-					self.log('>> %s'%line)
-					message = ' '.join(message)
-					self.debug("---Error--- "+message)
-					self._socket.close()
-					self.running = False
-				else:
-					self.log('>> %s'%line)
-					message = ' '.join(message)
-					self.debug("--Unknown message-- "+message)
+				self.log('>> %s'%line)
+				self.debug("--Unknown message-- "+msg._line)
 		except Exception,e:
 			self.debug('Error parsing line\n%s\n%s'%(line,e))
 			if self._debugvar >= 2:

@@ -20,8 +20,7 @@ kill.admin = True
 
 def help(bot,hostmask,line):
 	nick,host = hostmask['nick'],hostmask['host']
-	if len(line)==4: line.append('')
-	bot.irc_notice(nick,bot.command_help(line[4]))
+	bot.irc_notice(nick,bot.command_help(line.message))
 help.command = '.help'
 help.example = '.help <commandname>'
 
