@@ -1,12 +1,38 @@
-__purple__ = __name__
+import datetime
+import logging
+import random
+import re
 
 import requests
-import random
 
-from purplebot.decorators import threaded, ratelimit
+from purplebot import USER_AGENT
+from purplebot.decorators import ratelimit, threaded
+
+__purple__ = __name__
 
 URL_SUBMIT = 'http://localhost:8000/quotes/'
 URL_RANDOM = 'http://localhost:8000/quotes/random/'
+
+LAST_MESSAGE = datetime.datetime.utcnow()
+LOGGER = logging.getLogger(__name__)
+# Wait 3 hours between pings
+WAIT_TIME = 3 * 60 * 60
+
+_RECENT_QUOTES = []
+
+
+def reset_timer(self, line):
+    '''Reset the timer for the bot'''
+    LAST_MESSAGE = datetime.datetime.utcnow()
+    LOGGER.debug('Resetting timer %s', LAST_MESSAGE)
+reset_timer.event = 'privmsg'
+
+
+def check_ping(self, message):
+    now = datetime.datetime.utcnow()
+    if (now - LAST_MESSAGE).total_seconds() < WAIT_TIME:
+        return
+check_ping.event = 'ping'
 
 
 @threaded
@@ -17,21 +43,41 @@ def get_quote(bot, hostmask, line):
     if len(line) == 5:
         response = requests.get(
             bot.settings.get('QuotePlugin::submit', URL_SUBMIT),
-            params={'search': line[4]}
+            params={'search': line[4]},
+            headers={'user-agent': USER_AGENT}
         )
         try:
-            quote = random.choice(response.json())
+            quotes = response.json().get('results')
+            while quotes:
+                quote = random.choice(quotes)
+                if quote['id'] in _RECENT_QUOTES:
+                    quotes.remove(quote)
+                    LOGGER.debug('Seen %s recently', quote['id'])
+                    continue
+                break
+            quote['extra'] = '(Found %s) ' % response.json().get('count')
         except IndexError:
-            bot.irc_privmsg(hostmask['nick'], 'No quote found for %s' % line[4])
+            bot.irc_notice(hostmask['nick'], 'No quote found for %s' % line[4])
             return
     else:
-        response = requests.get(bot.settings.get('QuotePlugin::random', URL_RANDOM))
+        response = requests.get(
+            bot.settings.get('QuotePlugin::random', URL_RANDOM),
+            headers={'user-agent': USER_AGENT}
+        )
         quote = response.json()
+        quote['extra'] = ''
+
+    LOGGER.debug('Appending quote %s to recently seen', quote['id'])
+    _RECENT_QUOTES.append(quote['id'])
+    if len(_RECENT_QUOTES) > 10:
+        _RECENT_QUOTES.pop(0)
 
     try:
-        bot.irc_privmsg(dest, u'{created} {body}'.format(**quote))
+        quote['created'] = quote['created'].split('T')[0]
+        quote['body'] = re.sub('\s+', ' ', quote['body'])
+        bot.irc_privmsg(dest, '{extra}{created} {body}'.format(**quote))
     except KeyError:
-        bot.irc_privmsg(hostmask['nick'], 'Error reading quote')
+        bot.irc_notice(hostmask['nick'], 'Error reading quote')
 get_quote.command = '.quote'
 get_quote.example = '.quote [#]'
 
@@ -42,11 +88,12 @@ def add_quote(bot, hostmask, line):
         response = requests.post(
             bot.settings.get('QuotePlugin::submit', URL_SUBMIT),
             data={'body': line[4]},
-            auth=(bot.settings.get('Misc::rpcuser'), bot.settings.get('Misc::rpcpass'))
+            auth=(bot.settings.get('Misc::rpcuser'), bot.settings.get('Misc::rpcpass')),
+            headers={'user-agent': USER_AGENT}
         )
         response.raise_for_status()
     except:
-        bot.irc_privmsg(hostmask['nick'], 'Error adding quote')
+        bot.irc_notice(hostmask['nick'], 'Error adding quote')
     else:
-        bot.irc_privmsg(hostmask['nick'], 'Quote Added')
+        bot.irc_notice(hostmask['nick'], 'Quote Added')
 add_quote.command = '.addquote'
